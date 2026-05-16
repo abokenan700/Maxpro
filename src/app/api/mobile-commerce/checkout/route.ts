@@ -1,25 +1,39 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 
 const SAR_TAX_RATE = 0.15;
-
-type CheckoutLine = {
-  productId: string;
-  quantity: number;
-  unitPrice: number;
-};
+const checkoutSchema = z.object({
+  lines: z.array(
+    z.object({
+      productId: z.string().min(1),
+      quantity: z.number().int().min(1).max(10),
+      unitPrice: z.number().positive(),
+      selectedColor: z.string().optional()
+    })
+  ).min(1),
+  city: z.string().min(2).default("الرياض"),
+  coupon: z.string().trim().optional(),
+  walletCredit: z.number().min(0).default(0),
+  deliveryWindow: z.string().optional()
+});
 
 export async function POST(request: Request) {
-  const body = (await request.json()) as { lines?: CheckoutLine[]; city?: string; coupon?: string };
-  const lines = body.lines ?? [];
+  const parsed = checkoutSchema.safeParse(await request.json());
 
-  if (!lines.length) {
-    return NextResponse.json({ code: "EMPTY_CART", messageAr: "السلة فارغة، أضف منتجاً قبل إتمام الشراء." }, { status: 400 });
+  if (!parsed.success) {
+    return NextResponse.json(
+      { code: "INVALID_CHECKOUT", messageAr: "تحقق من بيانات السلة والتوصيل قبل المتابعة.", issues: parsed.error.flatten().fieldErrors },
+      { status: 422 }
+    );
   }
 
-  const subtotal = lines.reduce((sum, line) => sum + line.unitPrice * line.quantity, 0);
-  const shipping = body.city === "الرياض" ? 0 : 35;
-  const discount = body.coupon === "MAXPRO" ? Math.min(subtotal * 0.1, 150) : 0;
-  const taxable = subtotal + shipping - discount;
+  const body = parsed.data;
+  const subtotal = body.lines.reduce((sum, line) => sum + line.unitPrice * line.quantity, 0);
+  const shipping = body.city === "الرياض" || subtotal >= 500 ? 0 : 35;
+  const couponDiscount = body.coupon === "MAXPRO" ? Math.min(subtotal * 0.1, 150) : 0;
+  const walletDiscount = Math.min(body.walletCredit, Math.max(subtotal + shipping - couponDiscount, 0));
+  const discount = couponDiscount + walletDiscount;
+  const taxable = Math.max(subtotal + shipping - discount, 0);
   const tax = Math.round(taxable * SAR_TAX_RATE);
   const total = taxable + tax;
 
@@ -33,6 +47,8 @@ export async function POST(request: Request) {
     total,
     paymentMethods: ["Apple Pay", "Mada", "Visa", "Mastercard"],
     deliveryPromiseAr: body.city === "الرياض" ? "يصل خلال ٢٤ ساعة" : "يصل خلال ٢ إلى ٤ أيام",
+    selectedDeliveryWindow: body.deliveryWindow ?? "أقرب موعد متاح",
+    riskDecision: "APPROVED_LOW_RISK",
     nextAction: "CONFIRM_PAYMENT"
   });
 }

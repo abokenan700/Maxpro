@@ -22,6 +22,28 @@ enum InventoryStatus {
   OUT_OF_STOCK
 }
 
+enum PaymentStatus {
+  REQUIRES_ACTION
+  AUTHORIZED
+  CAPTURED
+  FAILED
+  REFUNDED
+}
+
+enum NotificationChannel {
+  PUSH
+  SMS
+  EMAIL
+  WHATSAPP
+}
+
+enum CmsPlacement {
+  HOME_HERO
+  PRODUCT_STORY
+  CHECKOUT_TRUST
+  ONBOARDING
+}
+
 model User {
   id            String         @id @default(cuid())
   phone         String         @unique
@@ -34,10 +56,29 @@ model User {
   orders        Order[]
   reviews       Review[]
   notifications Notification[]
+  walletLedger  WalletLedger[]
+  loyaltyLedger LoyaltyLedger[]
+  auditLogs     AuditLog[]
+  sessions      Session[]
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 
   @@index([phone])
+  @@index([createdAt])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshHash  String   @unique
+  deviceName   String?
+  ipHash       String?
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  createdAt    DateTime @default(now())
+
+  @@index([userId, expiresAt])
 }
 
 model Address {
@@ -63,29 +104,47 @@ model Category {
   id        String    @id @default(cuid())
   slug      String    @unique
   nameAr    String
+  sortOrder Int       @default(0)
+  products  Product[]
+  createdAt DateTime  @default(now())
+
+  @@index([sortOrder])
+}
+
+model Brand {
+  id        String    @id @default(cuid())
+  slug      String    @unique
+  nameAr    String
+  storyAr   String?
   products  Product[]
   createdAt DateTime  @default(now())
 }
 
 model Product {
-  id          String       @id @default(cuid())
-  sku         String       @unique
+  id          String          @id @default(cuid())
+  sku         String          @unique
   categoryId  String
-  category    Category     @relation(fields: [categoryId], references: [id])
+  category    Category        @relation(fields: [categoryId], references: [id])
+  brandId     String?
+  brand       Brand?          @relation(fields: [brandId], references: [id])
   nameAr      String
   storyAr     String
-  price       Decimal      @db.Decimal(12, 2)
-  compareAt   Decimal?     @db.Decimal(12, 2)
+  price       Decimal         @db.Decimal(12, 2)
+  compareAt   Decimal?        @db.Decimal(12, 2)
   status      InventoryStatus @default(IN_STOCK)
+  searchText  String
   variants    Variant[]
   media       Media[]
   reviews     Review[]
   orderItems  OrderItem[]
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  analytics   ProductAnalytics[]
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
 
   @@index([categoryId, status])
+  @@index([brandId])
   @@index([price])
+  @@index([searchText])
 }
 
 model Variant {
@@ -108,7 +167,10 @@ model Media {
   product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
   url       String
   altAr     String
+  kind      String  @default("IMAGE")
   sortOrder Int     @default(0)
+
+  @@index([productId, sortOrder])
 }
 
 model Order {
@@ -119,6 +181,7 @@ model Order {
   subtotal        Decimal     @db.Decimal(12, 2)
   discount        Decimal     @default(0) @db.Decimal(12, 2)
   shipping        Decimal     @default(0) @db.Decimal(12, 2)
+  tax             Decimal     @default(0) @db.Decimal(12, 2)
   total           Decimal     @db.Decimal(12, 2)
   items           OrderItem[]
   payments        Payment[]
@@ -147,17 +210,20 @@ model OrderItem {
 }
 
 model Payment {
-  id            String   @id @default(cuid())
+  id            String        @id @default(cuid())
   orderId       String
-  order         Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order         Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
   provider      String
-  providerRef   String   @unique
-  amount        Decimal  @db.Decimal(12, 2)
-  currency      String   @default("SAR")
-  status        String
-  createdAt     DateTime @default(now())
+  providerRef   String        @unique
+  amount        Decimal       @db.Decimal(12, 2)
+  currency      String        @default("SAR")
+  status        PaymentStatus @default(REQUIRES_ACTION)
+  riskDecision  String?
+  createdAt     DateTime      @default(now())
+  capturedAt    DateTime?
 
   @@index([orderId, status])
+  @@index([provider, status])
 }
 
 model Coupon {
@@ -168,6 +234,8 @@ model Coupon {
   percentOff  Int?
   startsAt    DateTime
   endsAt      DateTime
+  maxUses     Int?
+  usedCount   Int      @default(0)
   orders      Order[]
 
   @@index([code, startsAt, endsAt])
@@ -181,6 +249,7 @@ model Review {
   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   rating    Int
   bodyAr    String
+  verified  Boolean  @default(false)
   createdAt DateTime @default(now())
 
   @@index([productId, rating])
@@ -188,13 +257,84 @@ model Review {
 }
 
 model Notification {
-  id        String   @id @default(cuid())
+  id        String              @id @default(cuid())
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channel   NotificationChannel @default(PUSH)
   titleAr   String
   bodyAr    String
   readAt    DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime            @default(now())
 
   @@index([userId, readAt, createdAt])
+  @@index([channel, createdAt])
+}
+
+model WalletLedger {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount    Decimal  @db.Decimal(12, 2)
+  reasonAr  String
+  reference String?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+model LoyaltyLedger {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  points    Int
+  reasonAr  String
+  reference String?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+model ProductAnalytics {
+  id          String   @id @default(cuid())
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  impressions Int      @default(0)
+  addToCarts  Int      @default(0)
+  purchases   Int      @default(0)
+  revenue     Decimal  @default(0) @db.Decimal(14, 2)
+  date        DateTime
+
+  @@unique([productId, date])
+  @@index([date])
+}
+
+model CmsBlock {
+  id          String       @id @default(cuid())
+  placement   CmsPlacement
+  titleAr     String
+  bodyAr      String
+  mediaUrl    String?
+  ctaLabelAr  String?
+  ctaHref     String?
+  isActive    Boolean      @default(true)
+  startsAt    DateTime?
+  endsAt      DateTime?
+  sortOrder   Int          @default(0)
+  createdAt   DateTime     @default(now())
+
+  @@index([placement, isActive, sortOrder])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action    String
+  entity    String
+  entityId  String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([entity, entityId])
 }
