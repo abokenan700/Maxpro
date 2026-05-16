@@ -1,0 +1,79 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  --font-arabic: "Tajawal", "IBM Plex Sans Arabic", "Noto Kufi Arabic", Arial, sans-serif;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --surface: #fcfbf8;
+  --surface-raised: rgba(255, 255, 255, 0.86);
+  --ink: #211a15;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  direction: rtl;
+  max-width: 100vw;
+  overflow-x: hidden;
+  background: #efeadd;
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  background:
+    radial-gradient(circle at 75% -5%, rgba(247, 123, 18, 0.20), transparent 34%),
+    linear-gradient(180deg, #fbf6ec 0%, #f1e8d8 44%, #e9ddca 100%);
+  color: var(--ink);
+  font-family: var(--font-arabic);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mobile-shell {
+  width: min(100vw, 430px);
+  min-height: 100vh;
+  margin: 0 auto;
+  overflow: hidden;
+  background: var(--surface);
+  position: relative;
+  box-shadow: 0 0 0 1px rgba(33, 26, 21, 0.05), 0 28px 90px rgba(33, 26, 21, 0.18);
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
