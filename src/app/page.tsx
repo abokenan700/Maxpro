@@ -1,4 +1,4 @@
-import { BottomNavigation, CategoryRail, MobileHeader, ProductCard, ProductHero, SearchBar } from "@/components/mobile/ui";
+import { BottomNavigation, CartPreviewSheet, CategoryRail, MobileHeader, ProductCard, ProductDetailExperience, ProductHero, SearchBar } from "@/components/mobile/ui";
 import { categories, heroProduct, products, trustSignals } from "@/lib/commerce-data";
 import { formatSar } from "@/lib/design-system";
 
@@ -9,6 +9,7 @@ export default function HomePage() {
       <SearchBar />
       <CategoryRail categories={categories} />
       <ProductHero product={heroProduct} />
+      <ProductDetailExperience product={heroProduct} />
 
       <section className="px-5 pt-7">
         <div className="mb-4 flex items-end justify-between">
@@ -49,6 +50,8 @@ export default function HomePage() {
           </div>
         ))}
       </section>
+
+      <CartPreviewSheet />
 
       <BottomNavigation />
     </main>

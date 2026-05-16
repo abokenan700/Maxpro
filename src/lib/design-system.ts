@@ -9,8 +9,10 @@ export const designTokens = {
   },
   radius: {
     card: 28,
+    hero: 34,
     media: 24,
     control: 18,
+    sheet: 32,
     pill: 999
   },
   typography: {
@@ -23,7 +25,8 @@ export const designTokens = {
   motion: {
     spring: { type: "spring", stiffness: 310, damping: 28, mass: 0.9 },
     tap: { scale: 0.97 },
-    sheet: { type: "spring", stiffness: 260, damping: 32 }
+    sheet: { type: "spring", stiffness: 260, damping: 32 },
+    carousel: { type: "spring", stiffness: 240, damping: 30, mass: 0.8 }
   }
 } as const;
 
@@ -35,6 +38,14 @@ export const colorArchitecture = {
     tailwind: "brand-500",
     usage: "Primary purchase CTAs, selected navigation, high-intent highlights.",
     contrastOnInk1000: "8.4:1"
+  },
+  brandSecondary: {
+    hex: "#b98b53",
+    rgb: "185 139 83",
+    hsl: "33 42% 53%",
+    tailwind: "brand-luxury",
+    usage: "Premium storytelling badges, editorial surfaces, and giftable product moments.",
+    contrastOnInk1000: "7.1:1"
   },
   cta: {
     hex: "#211a15",
@@ -62,20 +73,35 @@ export const colorArchitecture = {
     1000: "#0b0806"
   },
   semantic: {
-    success: "#188c58",
-    error: "#c83737",
-    warning: "#c87a13",
-    info: "#2667c9"
+    success: { hex: "#188c58", rgb: "24 140 88", hsl: "153 71% 32%", usage: "Inventory confidence and successful payment feedback.", contrastOnWhite: "4.7:1" },
+    error: { hex: "#c83737", rgb: "200 55 55", hsl: "0 57% 50%", usage: "Validation errors, failed payments, and destructive confirmations.", contrastOnWhite: "4.3:1" },
+    warning: { hex: "#c87a13", rgb: "200 122 19", hsl: "34 83% 43%", usage: "Low-stock urgency and limited delivery windows.", contrastOnWhite: "3.1:1 with large/bold text" },
+    info: { hex: "#2667c9", rgb: "38 103 201", hsl: "216 68% 47%", usage: "Delivery intelligence, support notices, and neutral guidance.", contrastOnWhite: "5.1:1" }
   },
   surfaces: {
     app: "#fcfbf8",
     elevated: "rgba(255,255,255,0.86)",
     sheet: "#fffaf1",
     navigation: "rgba(255,255,255,0.78)",
+    glass: "rgba(255,255,255,0.18)",
     darkApp: "#0b0806",
     darkElevated: "#16110e"
   }
 } as const;
+
+export type ProductReview = {
+  id: string;
+  author: string;
+  rating: number;
+  body: string;
+  verified: boolean;
+};
+
+export type ProductBundle = {
+  title: string;
+  saving: number;
+  items: string[];
+};
 
 export type Product = {
   id: string;
@@ -87,9 +113,38 @@ export type Product = {
   reviews: number;
   badge: string;
   image: string;
+  gallery: string[];
   colors: string[];
   inventory: "high" | "medium" | "low";
+  deliveryPromise: string;
+  installmentMonths: number;
+  materials: string[];
+  bundle?: ProductBundle;
+  reviewHighlights: ProductReview[];
+};
+
+export type CheckoutQuote = {
+  subtotal: number;
+  shipping: number;
+  discount: number;
+  tax: number;
+  total: number;
 };
 
 export const formatSar = (value: number) =>
   new Intl.NumberFormat("ar-SA", { style: "currency", currency: "SAR", maximumFractionDigits: 0 }).format(value);
+
+export const normalizeArabicSearch = (value: string) =>
+  value
+    .trim()
+    .replace(/[أإآ]/g, "ا")
+    .replace(/ة/g, "ه")
+    .replace(/ى/g, "ي")
+    .replace(/[\u064B-\u065F]/g, "")
+    .toLowerCase();
+
+export const inventoryLabel = (inventory: Product["inventory"]) => {
+  if (inventory === "low") return { label: "كمية محدودة", tone: "warning" as const };
+  if (inventory === "medium") return { label: "متوفر بكمية جيدة", tone: "info" as const };
+  return { label: "متوفر الآن", tone: "success" as const };
+};
