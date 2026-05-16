@@ -1,0 +1,200 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum OrderStatus {
+  DRAFT
+  PLACED
+  PAID
+  FULFILLED
+  CANCELLED
+  REFUNDED
+}
+
+enum InventoryStatus {
+  IN_STOCK
+  LOW_STOCK
+  OUT_OF_STOCK
+}
+
+model User {
+  id            String         @id @default(cuid())
+  phone         String         @unique
+  email         String?        @unique
+  name          String
+  passwordHash  String?
+  loyaltyPoints Int            @default(0)
+  walletBalance Decimal        @default(0) @db.Decimal(12, 2)
+  addresses     Address[]
+  orders        Order[]
+  reviews       Review[]
+  notifications Notification[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([phone])
+}
+
+model Address {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label       String
+  recipient   String
+  phone       String
+  city        String
+  district    String
+  line1       String
+  geoLat      Decimal? @db.Decimal(9, 6)
+  geoLng      Decimal? @db.Decimal(9, 6)
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([userId, isDefault])
+  @@index([city, district])
+}
+
+model Category {
+  id        String    @id @default(cuid())
+  slug      String    @unique
+  nameAr    String
+  products  Product[]
+  createdAt DateTime  @default(now())
+}
+
+model Product {
+  id          String       @id @default(cuid())
+  sku         String       @unique
+  categoryId  String
+  category    Category     @relation(fields: [categoryId], references: [id])
+  nameAr      String
+  storyAr     String
+  price       Decimal      @db.Decimal(12, 2)
+  compareAt   Decimal?     @db.Decimal(12, 2)
+  status      InventoryStatus @default(IN_STOCK)
+  variants    Variant[]
+  media       Media[]
+  reviews     Review[]
+  orderItems  OrderItem[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([categoryId, status])
+  @@index([price])
+}
+
+model Variant {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  sku       String   @unique
+  colorHex  String
+  size      String?
+  stock     Int      @default(0)
+  reserved  Int      @default(0)
+
+  @@index([productId, colorHex])
+  @@index([stock])
+}
+
+model Media {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url       String
+  altAr     String
+  sortOrder Int     @default(0)
+}
+
+model Order {
+  id              String      @id @default(cuid())
+  userId          String
+  user            User        @relation(fields: [userId], references: [id])
+  status          OrderStatus @default(DRAFT)
+  subtotal        Decimal     @db.Decimal(12, 2)
+  discount        Decimal     @default(0) @db.Decimal(12, 2)
+  shipping        Decimal     @default(0) @db.Decimal(12, 2)
+  total           Decimal     @db.Decimal(12, 2)
+  items           OrderItem[]
+  payments        Payment[]
+  couponId        String?
+  coupon          Coupon?     @relation(fields: [couponId], references: [id])
+  deliveryWindow  DateTime?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@index([userId, status, createdAt])
+  @@index([createdAt])
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  variantId String
+  quantity  Int
+  unitPrice Decimal @db.Decimal(12, 2)
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+model Payment {
+  id            String   @id @default(cuid())
+  orderId       String
+  order         Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  provider      String
+  providerRef   String   @unique
+  amount        Decimal  @db.Decimal(12, 2)
+  currency      String   @default("SAR")
+  status        String
+  createdAt     DateTime @default(now())
+
+  @@index([orderId, status])
+}
+
+model Coupon {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  description String
+  amountOff   Decimal? @db.Decimal(12, 2)
+  percentOff  Int?
+  startsAt    DateTime
+  endsAt      DateTime
+  orders      Order[]
+
+  @@index([code, startsAt, endsAt])
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  rating    Int
+  bodyAr    String
+  createdAt DateTime @default(now())
+
+  @@index([productId, rating])
+  @@index([userId])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  titleAr   String
+  bodyAr    String
+  readAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId, readAt, createdAt])
+}
